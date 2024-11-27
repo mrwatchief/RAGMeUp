@@ -42,5 +42,8 @@ pandas
 scikit-learn 
 transformers 
 datasets 
-torch
-
+threading
+schedule
+time
+datetime
+sqlite3

@@ -183,7 +183,3 @@ class RAGActiveLearner:
         if hasattr(self, 'conn'):
             self.conn.close()
 
-# Example usage
-if __name__ == "__main__":
-    learner = RAGActiveLearner()
-    learner.run_active_learning_cycle()
