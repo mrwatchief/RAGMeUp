@@ -39,8 +39,6 @@ pydantic==2.7.4
 pydantic_core==2.18.4
 psycopg2-binary==2.9.9
 pandas == 2.2.3
-scikit-learn == 1.5.2
-transformers == 4.46.3
 datasets == 3.1.0
 sqlite3 == 3.47.1
 schedule == 1.2.2
