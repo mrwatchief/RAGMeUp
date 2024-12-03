@@ -4,12 +4,7 @@ from dotenv import load_dotenv
 import os
 from RAGHelper_cloud import RAGHelperCloud
 from RAGHelper_local import RAGHelperLocal
-from active_learning import RAGActiveLearner
 from pymilvus import Collection, connections
-import threading
-import schedule
-import time
-from datetime import datetime
 import sqlite3
 
 
@@ -222,140 +217,28 @@ def delete_document():
 
     return jsonify({"count": result.delete_count})
 
-@app.route("/feedback", methods=['POST'])
-def collect_feedback():
-    """
-    Collect user feedback on RAG system responses.
+@app.route('/save_feedback', methods=['POST'])
+def save_feedback():
+    data = request.json
+    query = data.get('query')
+    answer = data.get('answer')
+    document_id = data.get('document_id')
+    rating = data.get('rating')
+    timestamp = data.get('timestamp')
+    print(data)
     
-    Expected JSON payload:
-    {
-        "query": str,         # Original user query
-        "answer": str,        # System's generated answer
-        "rating": int,        # User's rating (1-5)
-        "additional_comments": str  # Optional user comments
-    }
+    conn = sqlite3.connect('feedback.db')
+    cursor = conn.cursor()
     
-    Returns:
-        JSON response with feedback status
-    """
-    json_data = request.get_json()
+    cursor.execute('''
+        INSERT INTO Feedback (query, answer, document_id, rating, timestamp) 
+        VALUES (?, ?, ?, ?, ?)
+    ''', (query, answer, document_id, rating, timestamp))
     
-    # Validate input
-    required_fields = ['query', 'answer', 'rating']
-    for field in required_fields:
-        if field not in json_data:
-            return jsonify({"error": f"Missing required field: {field}"}), 400
+    conn.commit()
+    conn.close()
     
-    try:
-        # Connect to the feedback database
-        conn = sqlite3.connect('feedback.db')
-        cursor = conn.cursor()
-        
-        # Create table if not exists
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Feedback (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                query TEXT,
-                answer TEXT,
-                rating INTEGER,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                additional_comments TEXT
-            )
-        ''')
-        
-        # Insert feedback
-        cursor.execute('''
-            INSERT INTO Feedback (query, answer, rating, additional_comments)
-            VALUES (?, ?, ?, ?)
-        ''', (
-            json_data['query'], 
-            json_data['answer'], 
-            json_data['rating'],
-            json_data.get('additional_comments', '')
-        ))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({"status": "Feedback collected successfully"}), 200
-    
-    except sqlite3.Error as e:
-        logger.error(f"Database error: {e}")
-        return jsonify({"error": "Failed to store feedback"}), 500
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        return jsonify({"error": "An unexpected error occurred"}), 500
-
-class ActiveLearningScheduler:
-    def __init__(self, 
-                 interval_hours: int = 24, 
-                 minimum_feedback_threshold: int = 10):
-        """
-        Initialize the Active Learning Scheduler.
-        
-        Args:
-            interval_hours (int): How often to run the active learning cycle
-            minimum_feedback_threshold (int): Minimum number of feedback entries to trigger learning
-        """
-        self.interval_hours = interval_hours
-        self.minimum_feedback_threshold = minimum_feedback_threshold
-        self.learner = RAGActiveLearner()
-        self.stop_event = threading.Event()
-        
-    def _run_active_learning_cycle(self):
-        """
-        Run the active learning cycle if sufficient feedback is available.
-        """
-        try:
-            # Analyze feedback trends
-            insights = self.learner.analyze_feedback_trends()
-            
-            # Check if we have enough feedback to trigger learning
-            if insights['total_feedback_count'] >= self.minimum_feedback_threshold:
-                print(f"[{datetime.now()}] Running Active Learning Cycle")
-                self.learner.run_active_learning_cycle()
-                
-                # Optional: Log insights or send notifications
-                print("Active Learning Insights:", insights)
-            else:
-                print(f"Not enough feedback. Current count: {insights['total_feedback_count']}")
-        
-        except Exception as e:
-            print(f"Error in active learning cycle: {e}")
-    
-    def start(self):
-        """
-        Start the background scheduling of active learning cycles.
-        """
-        def scheduled_job():
-            while not self.stop_event.is_set():
-                schedule.run_pending()
-                time.sleep(1)
-        
-        # Schedule the job to run at specified intervals
-        schedule.every(self.interval_hours).hours.do(self._run_active_learning_cycle)
-        
-        # Start the scheduler in a background thread
-        thread = threading.Thread(target=scheduled_job)
-        thread.daemon = True
-        thread.start()
-        
-        print(f"Active Learning Scheduler started. Will run every {self.interval_hours} hours.")
-    
-    def stop(self):
-        """
-        Stop the background scheduler.
-        """
-        self.stop_event.set()
-        schedule.clear()
-        print("Active Learning Scheduler stopped.")
+    return jsonify({"status": "success", "message": "Feedback saved"})
 
 if __name__ == "__main__":
-    # Initialize the scheduler
-    active_learning_scheduler = ActiveLearningScheduler(
-        interval_hours=24,  # Run daily
-        minimum_feedback_threshold=10  # Require at least 10 feedback entries
-    )
-    active_learning_scheduler.start()
-
     app.run(host="0.0.0.0")
