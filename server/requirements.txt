@@ -38,12 +38,5 @@ accelerate==0.34.0
 pydantic==2.7.4
 pydantic_core==2.18.4
 psycopg2-binary==2.9.9
-pandas
-scikit-learn 
-transformers 
-datasets 
-threading
-schedule
-time
-datetime
-sqlite3
+pandas == 2.2.3
+scikit-learn == 1.5.2
