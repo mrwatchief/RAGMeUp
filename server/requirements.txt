@@ -41,3 +41,4 @@ psycopg2-binary==2.9.9
 pandas == 2.2.3
 datasets == 3.1.0
 schedule == 1.2.2
+peft == 0.13.2

@@ -11,6 +11,12 @@ from transformers import (
 from datasets import Dataset
 import os
 from datetime import datetime, timedelta
+from peft import (
+    LoraConfig, 
+    get_peft_model, 
+    prepare_model_for_kbit_training
+)
+from transformers import BitsAndBytesConfig
 
 class LLMFinetuner:
     def __init__(self, 
@@ -31,14 +37,40 @@ class LLMFinetuner:
         
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
+
+        # Quantization configuration
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True
+        )
         
-        # Load tokenizer and model
+        # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        
+        # Load model with quantization
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name, 
-            torch_dtype=torch.float16,
+            quantization_config=quantization_config,
             device_map='auto'
         )
+        
+        # Prepare model for training with PEFT (Parameter-Efficient Fine-Tuning)
+        self.model = prepare_model_for_kbit_training(self.model)
+        
+        # LoRA configuration
+        peft_config = LoraConfig(
+            r=16,  # Low-rank adaptation dimension
+            lora_alpha=32,  # Scaling factor
+            target_modules=["q_proj", "v_proj"],
+            lora_dropout=0.1,
+            bias="none",
+            task_type="CAUSAL_LM"
+        )
+        
+        # Apply LoRA
+        self.model = get_peft_model(self.model, peft_config)
         
         # Configure tokenizer
         self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -108,7 +140,7 @@ class LLMFinetuner:
             training_texts, 
             truncation=True, 
             padding=True, 
-            max_length=512
+            max_length=128 #Reduced sequence length (normally: 512)
         )
         
         # Create Hugging Face Dataset
@@ -117,7 +149,7 @@ class LLMFinetuner:
             'attention_mask': tokenized_dataset['attention_mask']
         })
 
-    def fine_tune(self, train_dataset, epochs=3, batch_size=4):
+    def fine_tune(self, train_dataset, epochs=1, batch_size=1):
         """
         Fine-tune the model on the prepared dataset
         
@@ -132,12 +164,14 @@ class LLMFinetuner:
             overwrite_output_dir=True,
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
-            save_steps=10_000,
+            save_steps=100, # Reduced save frequency (Normally: 10_000)
             save_total_limit=2,
             prediction_loss_only=True,
             fp16=True,
-            learning_rate=5e-5,
+            learning_rate=1e-4, # Reduced learning rate (Normally: 5e-5)
             weight_decay=0.01,
+            logging_steps=10,
+            logging_dir='./logs',
         )
         
         # Prepare data collator
@@ -153,6 +187,7 @@ class LLMFinetuner:
             train_dataset=train_dataset,
             data_collator=data_collator
         )
+
         
         # Start training
         trainer.train()
@@ -163,9 +198,9 @@ class LLMFinetuner:
         # Save the tokenizer
         self.tokenizer.save_pretrained(self.output_dir)
 
-    def run_fine_tuning_pipeline(self, days=30, epochs=3, batch_size=4):
+    def run_fine_tuning_pipeline(self, days=30, epochs=2, batch_size=2):
         """
-        Run the complete fine-tuning pipeline
+        Run the complete fine-tuning pipeline. Was reduced due to the GPU not being able to handle it.
         
         Args:
             days (int): Number of days to look back for feedback
@@ -187,7 +222,3 @@ class LLMFinetuner:
         
         print(f"Fine-tuning completed. Model saved to {self.output_dir}")
 
-# Example usage
-if __name__ == "__main__":
-    fine_tuner = LLMFinetuner()
-    fine_tuner.run_fine_tuning_pipeline()
