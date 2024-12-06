@@ -198,7 +198,7 @@ class LLMFinetuner:
         # Save the tokenizer
         self.tokenizer.save_pretrained(self.output_dir)
 
-    def run_fine_tuning_pipeline(self, days=30, epochs=2, batch_size=2):
+    def run_fine_tuning_pipeline(self, days=30, epochs=1, batch_size=1):
         """
         Run the complete fine-tuning pipeline. Was reduced due to the GPU not being able to handle it.
         

@@ -11,7 +11,7 @@ def periodic_fine_tuning():
         fine_tuner = LLMFinetuner()
         fine_tuner.run_fine_tuning_pipeline(
             days=7,   # Look back 7 days
-            epochs=2,  # 2 training epochs
+            epochs=1,  # 2 training epochs
             batch_size=1  # Batch size for training
         )
     except Exception as e:
