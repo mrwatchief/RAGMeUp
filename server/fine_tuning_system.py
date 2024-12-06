@@ -17,6 +17,11 @@ from peft import (
     prepare_model_for_kbit_training
 )
 from transformers import BitsAndBytesConfig
+import os
+import wandb
+
+# Add this near the top of the file, before the class definition
+os.environ['WANDB_DISABLED'] = 'true'
 
 class LLMFinetuner:
     def __init__(self, 
@@ -172,6 +177,9 @@ class LLMFinetuner:
             weight_decay=0.01,
             logging_steps=10,
             logging_dir='./logs',
+            # Wandb configuration
+            report_to="none",  # Disable all reporting
+            run_name=f"fine_tune_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         )
         
         # Prepare data collator
